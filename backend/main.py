@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from database import init_db
-from routers import notes, uploads, videos
+from routers import folders, notes, uploads, videos
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)  # must exist before StaticFiles mounts
@@ -27,6 +27,7 @@ app = FastAPI(title="Anchor API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(videos.router)
 app.include_router(notes.router)
 app.include_router(uploads.router)
+app.include_router(folders.router)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 

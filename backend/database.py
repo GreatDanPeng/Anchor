@@ -13,6 +13,13 @@ def get_db() -> sqlite3.Connection:
 def init_db() -> None:
     with get_db() as conn:
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS videos (
                 id TEXT PRIMARY KEY,
                 url TEXT NOT NULL,
@@ -21,6 +28,7 @@ def init_db() -> None:
                 channel TEXT DEFAULT '',
                 duration TEXT DEFAULT '',
                 subtitle_status TEXT DEFAULT 'none',
+                folder_id INTEGER REFERENCES folders(id),
                 added_at TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -33,4 +41,8 @@ def init_db() -> None:
                 FOREIGN KEY (video_id) REFERENCES videos(id)
             )
         """)
+        # Migrate existing databases that lack folder_id column
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(videos)").fetchall()]
+        if "folder_id" not in cols:
+            conn.execute("ALTER TABLE videos ADD COLUMN folder_id INTEGER REFERENCES folders(id)")
         conn.commit()
