@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 8px;
+  background: #dbeafe; /* blue-100 — shows as the "glow" around the rounded card */
+  min-width: 376px;
 }
