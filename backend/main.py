@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from database import init_db
-from routers import folders, notes, uploads, videos
+from routers import anchor, folders, notes, uploads, videos
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)  # must exist before StaticFiles mounts
@@ -37,6 +37,7 @@ app.include_router(videos.router)
 app.include_router(notes.router)
 app.include_router(uploads.router)
 app.include_router(folders.router)
+app.include_router(anchor.router)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 

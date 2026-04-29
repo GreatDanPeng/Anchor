@@ -6,7 +6,7 @@
 
 body {
   margin: 0;
-  padding: 8px;
-  background: #dbeafe; /* blue-100 — shows as the "glow" around the rounded card */
+  padding: 10px;
+  background: #bfdbfe; /* blue-200 — frames the rounded card */
   min-width: 376px;
 }

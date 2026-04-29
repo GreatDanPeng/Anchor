@@ -1,4 +1,4 @@
-import type { Folder, ModelConfig, Note, Video } from '../types'
+import type { FeedbackNote, Folder, ModelConfig, Note, Video } from '../types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -71,5 +71,14 @@ export const api = {
     const form = new FormData()
     form.append('file', file)
     return request('/upload', { method: 'POST', body: form })
+  },
+  anchor: {
+    classify: (date?: string): Promise<FeedbackNote> =>
+      request('/anchor/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: date ?? null }),
+      }),
+    listFeedback: (): Promise<FeedbackNote[]> => request('/anchor/feedback'),
   },
 }

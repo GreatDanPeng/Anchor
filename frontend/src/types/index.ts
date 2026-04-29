@@ -27,6 +27,13 @@ export interface Folder {
   created_at: string
 }
 
+export interface FeedbackNote {
+  id: number
+  date: string
+  content: string
+  created_at: string
+}
+
 export type ModelProvider = 'deepseek' | 'claude' | 'openai-compatible'
 
 export interface ModelConfig {

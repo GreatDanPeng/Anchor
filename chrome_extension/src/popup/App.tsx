@@ -16,7 +16,7 @@ export default function App() {
   useEffect(() => {
     Promise.all([api.videos.list(), api.folders.list()])
       .then(([v, f]) => { setVideos(v); setFolders(f) })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -26,10 +26,19 @@ export default function App() {
 
   function renderContent() {
     if (loading) {
-      return <div className="flex items-center justify-center h-40 text-gray-400 text-xs">Loading…</div>
+      return (
+        <div className="flex items-center justify-center h-40 text-blue-300 text-xs">
+          Loading…
+        </div>
+      )
     }
     if (error) {
-      return <div className="p-4 text-red-500 text-xs">Cannot reach Anchor backend (localhost:8000). Make sure it's running.</div>
+      return (
+        <div className="p-4 text-red-400 text-xs text-center">
+          Cannot reach Anchor backend (localhost:8000).
+          <br />Make sure it's running.
+        </div>
+      )
     }
     if (tab === 'current') {
       return (
@@ -52,29 +61,32 @@ export default function App() {
   }
 
   return (
-    <div className="w-[360px] bg-white rounded-2xl overflow-hidden shadow-xl font-sans text-sm text-gray-800">
+    <div className="w-[356px] bg-white rounded-3xl overflow-hidden shadow-2xl font-sans text-sm text-gray-800">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 bg-gradient-to-br from-blue-600 to-blue-500">
-        <span className="font-bold text-white text-base tracking-tight">⚓ Anchor</span>
-        <div className="flex gap-1">
-          {(['current', 'collection'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                tab === t
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-blue-100 hover:bg-blue-400/40'
-              }`}
-            >
-              {t === 'current' ? 'Current' : 'Collection'}
-            </button>
-          ))}
+      <div className="px-5 pt-5 pb-4 bg-gradient-to-br from-blue-500 to-blue-400">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-white text-base tracking-tight">⚓ Anchor</span>
+          <div className="flex gap-1.5">
+            {(['current', 'collection'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  tab === t
+                    ? 'bg-white text-blue-500 shadow-sm'
+                    : 'text-blue-100 hover:bg-white/20'
+                }`}
+              >
+                {t === 'current' ? 'Current' : 'Collection'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-h-[520px] overflow-y-auto">
+      <div className="max-h-[540px] overflow-y-auto bg-blue-50/30">
         {renderContent()}
       </div>
     </div>
