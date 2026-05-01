@@ -27,20 +27,7 @@ export interface Folder {
   created_at: string
 }
 
-export interface FeedbackNote {
-  id: number
-  date: string
-  content: string
-  created_at: string
-}
-
-export type ModelProvider = 'deepseek' | 'claude' | 'openai-compatible'
-
-export interface ModelConfig {
-  id: string
-  name: string
-  provider: ModelProvider
-  model: string
-  api_key?: string
-  base_url?: string
+export interface CurrentVideoInfo {
+  videoId: string
+  url: string
 }

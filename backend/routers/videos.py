@@ -11,9 +11,12 @@ from database import get_db
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
+_SELECT_VIDEO = "SELECT id FROM videos WHERE id = ?"
+
 
 class AddVideoRequest(BaseModel):
     url: str
+    folder_id: Optional[int] = None
 
 
 def _extract_video_id(url: str) -> Optional[str]:
@@ -85,24 +88,36 @@ async def add_video(body: AddVideoRequest):
     subtitle_status = await asyncio.to_thread(_get_subtitle_status, metadata["id"])
 
     with get_db() as conn:
-        if conn.execute("SELECT id FROM videos WHERE id = ?", (metadata["id"],)).fetchone():
+        if conn.execute(_SELECT_VIDEO, (metadata["id"],)).fetchone():
             raise HTTPException(status_code=409, detail="Video already in your collection")
 
         conn.execute(
-            "INSERT INTO videos (id, url, title, thumbnail, channel, duration, subtitle_status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO videos (id, url, title, thumbnail, channel, duration, subtitle_status, folder_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (metadata["id"], url, metadata["title"], metadata["thumbnail"],
-             metadata["channel"], metadata["duration"], subtitle_status),
+             metadata["channel"], metadata["duration"], subtitle_status, body.folder_id),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM videos WHERE id = ?", (metadata["id"],)).fetchone()
         return {**dict(row), "has_notes": False}
 
 
+@router.put("/{video_id}/folder")
+def move_to_folder(video_id: str, body: dict):
+    folder_id = body.get("folder_id")  # None to remove from folder
+    with get_db() as conn:
+        if not conn.execute(_SELECT_VIDEO, (video_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Video not found")
+        conn.execute("UPDATE videos SET folder_id = ? WHERE id = ?", (folder_id, video_id))
+        conn.commit()
+        row = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+        return dict(row)
+
+
 @router.delete("/{video_id}")
 def delete_video(video_id: str):
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM videos WHERE id = ?", (video_id,)).fetchone():
+        if not conn.execute(_SELECT_VIDEO, (video_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Video not found")
         conn.execute("DELETE FROM notes WHERE video_id = ?", (video_id,))
         conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))

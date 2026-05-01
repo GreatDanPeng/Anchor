@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: transparent !important;
+}
+
+body {
+  margin: 0;
+  /* padding gives the card's drop-shadow room to render */
+  padding: 8px;
+  width: fit-content;
+}
