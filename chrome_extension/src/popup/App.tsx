@@ -61,11 +61,14 @@ export default function App() {
   }
 
   return (
-    <div className="w-[356px] bg-white rounded-3xl overflow-hidden shadow-2xl font-sans text-sm text-gray-800">
+    <div className="w-[356px] bg-white rounded-3xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.22)] font-sans text-sm text-gray-800">
       {/* Header */}
       <div className="px-5 pt-5 pb-4 bg-gradient-to-br from-blue-500 to-blue-400">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-white text-base tracking-tight">⚓ Anchor</span>
+          <div className="flex items-center gap-2">
+            <img src="icons/icon_white.png" alt="" className="h-6 w-6 object-contain" />
+            <span className="font-bold text-white text-base tracking-tight">Anchor</span>
+          </div>
           <div className="flex gap-1.5">
             {(['current', 'collection'] as Tab[]).map((t) => (
               <button

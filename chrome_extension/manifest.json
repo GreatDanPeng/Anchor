@@ -19,10 +19,10 @@
   "action": {
     "default_popup": "index.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/icon_black.png",
+      "32": "icons/icon_black.png",
+      "48": "icons/icon_black.png",
+      "128": "icons/icon_black.png"
     }
   },
   "web_accessible_resources": [
@@ -32,9 +32,9 @@
     }
   ],
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/icon_black.png",
+    "32": "icons/icon_black.png",
+    "48": "icons/icon_black.png",
+    "128": "icons/icon_black.png"
   }
 }

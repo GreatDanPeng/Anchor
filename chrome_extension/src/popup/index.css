@@ -4,9 +4,13 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  background: transparent !important;
+}
+
 body {
   margin: 0;
-  padding: 10px;
-  background: #bfdbfe; /* blue-200 — frames the rounded card */
-  min-width: 376px;
+  /* padding gives the card's drop-shadow room to render */
+  padding: 8px;
+  width: fit-content;
 }
