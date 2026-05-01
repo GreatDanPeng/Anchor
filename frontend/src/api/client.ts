@@ -1,4 +1,4 @@
-import type { FeedbackNote, Folder, ModelConfig, Note, Video } from '../types'
+import type { FeedbackNote, Folder, ModelConfig, Note, Page, PageNote, Video } from '../types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -71,6 +71,32 @@ export const api = {
     const form = new FormData()
     form.append('file', file)
     return request('/upload', { method: 'POST', body: form })
+  },
+  pages: {
+    list: (): Promise<Page[]> => request('/pages'),
+    add: (url: string, folderId?: number): Promise<Page> =>
+      request('/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, folder_id: folderId ?? null }),
+      }),
+    delete: (id: number): Promise<{ deleted: boolean }> =>
+      request(`/pages/${id}`, { method: 'DELETE' }),
+    moveToFolder: (id: number, folderId: number | null): Promise<Page> =>
+      request(`/pages/${id}/folder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_id: folderId }),
+      }),
+    getNotes: (pageId: number): Promise<PageNote[]> => request(`/pages/${pageId}/notes`),
+    updateNote: (pageId: number, content: string): Promise<PageNote> =>
+      request(`/pages/${pageId}/note`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      }),
+    regenerate: (pageId: number): Promise<PageNote> =>
+      request(`/pages/${pageId}/regenerate`, { method: 'POST' }),
   },
   anchor: {
     classify: (date?: string): Promise<FeedbackNote> =>

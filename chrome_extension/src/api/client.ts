@@ -1,4 +1,4 @@
-import type { Folder, Note, Video } from '../types'
+import type { Folder, Note, Page, PageNote, Video } from '../types'
 
 const BASE_URL = 'http://localhost:8000'
 
@@ -35,6 +35,21 @@ export const api = {
         body: JSON.stringify({ video_id: videoId }),
       }),
     get: (videoId: string): Promise<Note[]> => request(`/notes/${videoId}`),
+  },
+  pages: {
+    add: (url: string, folderId?: number): Promise<Page> =>
+      request('/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, folder_id: folderId ?? null }),
+      }),
+    getNotes: (pageId: number): Promise<PageNote[]> => request(`/pages/${pageId}/notes`),
+    moveToFolder: (id: number, folderId: number | null): Promise<Page> =>
+      request(`/pages/${id}/folder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_id: folderId }),
+      }),
   },
   folders: {
     list: (): Promise<Folder[]> => request('/folders'),

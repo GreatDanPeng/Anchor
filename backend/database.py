@@ -42,6 +42,29 @@ def init_db() -> None:
             )
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS pages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                url         TEXT NOT NULL UNIQUE,
+                title       TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                site_name   TEXT NOT NULL DEFAULT '',
+                author      TEXT NOT NULL DEFAULT '',
+                thumbnail   TEXT NOT NULL DEFAULT '',
+                content     TEXT NOT NULL DEFAULT '',
+                folder_id   INTEGER REFERENCES folders(id),
+                added_at    TEXT DEFAULT (datetime('now')),
+                has_notes   INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS page_notes (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id      INTEGER NOT NULL REFERENCES pages(id),
+                content      TEXT NOT NULL,
+                generated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS feedback_notes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL UNIQUE,

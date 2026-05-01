@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import {
   BookOpen, Check, ChevronDown, ChevronRight,
-  FolderOpen, Loader2, Pencil, RefreshCw, Sparkles, X,
+  FileText, FolderOpen, Globe, Loader2, Pencil,
+  RefreshCw, Sparkles, X,
 } from 'lucide-react'
-import type { FeedbackNote, Folder, ModelConfig, Note, Video } from '../types'
+import type { FeedbackNote, Folder, ModelConfig, Note, Page, PageNote, Video } from '../types'
 import { api } from '../api/client'
 import { AppHeader } from '../components/AppHeader'
 import { AddModelModal } from '../components/AddModelModal'
@@ -22,7 +23,6 @@ const BUILTIN_MODELS: ModelConfig[] = [
 const LS_CUSTOM = 'anchor:custom_models'
 const LS_SELECTED = 'anchor:selected_model'
 
-// Folder badge colors — cycle by folder.id
 const FOLDER_COLORS = [
   'bg-blue-100 text-blue-600',
   'bg-purple-100 text-purple-600',
@@ -34,9 +34,7 @@ const FOLDER_COLORS = [
   'bg-teal-100 text-teal-600',
 ]
 
-function folderColor(folderId: number) {
-  return FOLDER_COLORS[folderId % FOLDER_COLORS.length]
-}
+function folderColor(id: number) { return FOLDER_COLORS[id % FOLDER_COLORS.length] }
 
 function loadCustomModels(): ModelConfig[] {
   try { return JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]') } catch { return [] }
@@ -48,22 +46,26 @@ function formatDate(s: string) {
   })
 }
 
-// ── FolderRow ─────────────────────────────────────────────────────────────
+// ── Discriminated union for sidebar entries ────────────────────────────────
+
+type Entry =
+  | { kind: 'video'; item: Video }
+  | { kind: 'page';  item: Page  }
+
+function entryId(e: Entry) { return `${e.kind}:${e.item.id}` }
+function entryFolderId(e: Entry) { return e.item.folder_id }
+function entryHasNotes(e: Entry) { return Boolean(e.item.has_notes) }
+
+// ── FolderRow ──────────────────────────────────────────────────────────────
 
 function FolderRow({
   folder, isSelected, isDragOver,
   onSelect, onRename, onDelete,
   onDragOver, onDragLeave, onDrop,
 }: {
-  folder: Folder
-  isSelected: boolean
-  isDragOver: boolean
-  onSelect: () => void
-  onRename: (name: string) => Promise<void>
-  onDelete: () => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent) => void
+  folder: Folder; isSelected: boolean; isDragOver: boolean
+  onSelect: () => void; onRename: (n: string) => Promise<void>; onDelete: () => void
+  onDragOver: (e: React.DragEvent) => void; onDragLeave: () => void; onDrop: (e: React.DragEvent) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(folder.name)
@@ -78,61 +80,44 @@ function FolderRow({
 
   return (
     <div
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
       className={`group flex items-center gap-1 px-3 py-2 cursor-pointer border-l-2 transition-colors ${
-        isDragOver
-          ? 'bg-blue-100 border-l-blue-400'
-          : isSelected
-          ? 'bg-blue-50 border-l-blue-500'
-          : 'border-l-transparent hover:bg-gray-50'
+        isDragOver ? 'bg-blue-100 border-l-blue-400'
+        : isSelected ? 'bg-blue-50 border-l-blue-500'
+        : 'border-l-transparent hover:bg-gray-50'
       }`}
     >
       <FolderOpen size={13} className={`flex-shrink-0 ${isSelected || isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
-
       {editing ? (
-        <input
-          ref={inputRef}
-          value={draft}
+        <input ref={inputRef} value={draft}
           onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
+          onBlur={() => { void commit() }}
           onKeyDown={e => {
             if (e.key === 'Enter') { void commit() }
             if (e.key === 'Escape') { setDraft(folder.name); setEditing(false) }
           }}
-          className="flex-1 text-sm bg-transparent border-b border-blue-400 outline-none py-px"
-          autoFocus
-        />
+          className="flex-1 text-sm bg-transparent border-b border-blue-400 outline-none py-px" autoFocus />
       ) : (
         <button onClick={onSelect} className="flex-1 text-left text-sm truncate">
           <span className={isSelected ? 'font-semibold text-blue-800' : 'text-gray-700'}>{folder.name}</span>
           <span className="text-xs text-gray-400 ml-1">({folder.video_count})</span>
         </button>
       )}
-
       {!editing && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
-            onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }}
-            className="p-0.5 rounded text-gray-400 hover:text-gray-700" title="Rename"
-          >
-            <Pencil size={11} />
-          </button>
-          <button onClick={onDelete} className="p-0.5 rounded text-gray-400 hover:text-red-500" title="Delete folder">
-            <X size={11} />
-          </button>
+          <button onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }}
+            className="p-0.5 rounded text-gray-400 hover:text-gray-700" title="Rename"><Pencil size={11} /></button>
+          <button onClick={onDelete} className="p-0.5 rounded text-gray-400 hover:text-red-500" title="Delete folder"><X size={11} /></button>
         </div>
       )}
     </div>
   )
 }
 
-// ── FolderPicker (move-to-folder dropdown) ────────────────────────────────
+// ── FolderPicker ───────────────────────────────────────────────────────────
 
-function FolderPicker({ videoId, currentFolderId, folders, onChange }: {
-  videoId: string; currentFolderId: number | null; folders: Folder[]
-  onChange: (folderId: number | null) => void
+function FolderPicker({ currentFolderId, folders, onChange }: {
+  currentFolderId: number | null; folders: Folder[]; onChange: (id: number | null) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -143,22 +128,15 @@ function FolderPicker({ videoId, currentFolderId, folders, onChange }: {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  const options: { id: number | null; label: string }[] = [
-    { id: null, label: 'Unsorted' },
-    ...folders.map(f => ({ id: f.id, label: f.name })),
-  ]
-
   return (
     <div ref={ref} className="relative flex-shrink-0">
-      <button
-        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
-        className="p-0.5 rounded text-gray-300 hover:text-blue-500 transition-colors" title="Move to folder"
-      >
+      <button onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+        className="p-0.5 rounded text-gray-300 hover:text-blue-500 transition-colors" title="Move to folder">
         <ChevronDown size={11} />
       </button>
       {open && (
         <div className="absolute left-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1">
-          {options.map(o => (
+          {[{ id: null, label: 'Unsorted' }, ...folders.map(f => ({ id: f.id, label: f.name }))].map(o => (
             <button key={String(o.id)} onClick={() => { onChange(o.id); setOpen(false) }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-left">
               <Check size={11} className={o.id === currentFolderId ? 'text-blue-600' : 'invisible'} />
@@ -171,35 +149,39 @@ function FolderPicker({ videoId, currentFolderId, folders, onChange }: {
   )
 }
 
-// ── SidebarItem ───────────────────────────────────────────────────────────
+// ── SidebarEntryItem ───────────────────────────────────────────────────────
 
-function SidebarItem({ video, isSelected, folders, onClick, onFolderChange, onDragStart, onDragEnd }: {
-  video: Video; isSelected: boolean; folders: Folder[]
-  onClick: () => void
-  onFolderChange: (folderId: number | null) => void
-  onDragStart: () => void
-  onDragEnd: () => void
+function SidebarEntryItem({ entry, isSelected, folders, onClick, onFolderChange, onDragStart, onDragEnd }: {
+  entry: Entry; isSelected: boolean; folders: Folder[]
+  onClick: () => void; onFolderChange: (id: number | null) => void
+  onDragStart: () => void; onDragEnd: () => void
 }) {
-  const folder = folders.find(f => f.id === video.folder_id)
+  const folder = folders.find(f => f.id === entryFolderId(entry))
+  const isPage = entry.kind === 'page'
+  const item = entry.item as Video & Page
 
   return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+    <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd}
       className={`group flex items-center gap-1 px-3 py-2.5 border-l-2 transition-colors cursor-grab active:cursor-grabbing ${
         isSelected ? 'bg-blue-50 border-l-blue-500' : 'border-l-transparent hover:bg-gray-50'
       }`}
     >
       <button onClick={onClick} className="flex items-start gap-2 flex-1 min-w-0 text-left">
-        {video.thumbnail && (
-          <img src={video.thumbnail} alt="" className="w-10 h-6 rounded object-cover flex-shrink-0 mt-0.5" />
+        {/* Thumbnail / icon */}
+        {item.thumbnail ? (
+          <img src={item.thumbnail} alt="" className="w-10 h-6 rounded object-cover flex-shrink-0 mt-0.5" />
+        ) : (
+          <div className="w-10 h-6 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            {isPage ? <Globe size={12} className="text-gray-400" /> : <FileText size={12} className="text-gray-400" />}
+          </div>
         )}
         <div className="min-w-0">
           <p className={`text-xs leading-snug line-clamp-2 ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}>
-            {video.title}
+            {item.title}
           </p>
-          <p className="text-xs text-gray-400 truncate">{video.channel}</p>
+          <p className="text-xs text-gray-400 truncate">
+            {isPage ? (item.site_name || new URL(item.url).hostname) : item.channel}
+          </p>
           {folder && (
             <span className={`mt-1 inline-block text-[10px] px-1.5 py-px rounded-full font-medium ${folderColor(folder.id)}`}>
               {folder.name}
@@ -208,29 +190,23 @@ function SidebarItem({ video, isSelected, folders, onClick, onFolderChange, onDr
         </div>
       </button>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-        <FolderPicker videoId={video.id} currentFolderId={video.folder_id} folders={folders} onChange={onFolderChange} />
+        <FolderPicker currentFolderId={entryFolderId(entry)} folders={folders} onChange={onFolderChange} />
       </div>
     </div>
   )
 }
 
-// ── Drop zone (for "unsorted") ────────────────────────────────────────────
+// ── UnsortedDropZone ───────────────────────────────────────────────────────
 
 function UnsortedDropZone({ active, onDragOver, onDragLeave, onDrop }: {
   active: boolean
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent) => void; onDragLeave: () => void; onDrop: (e: React.DragEvent) => void
 }) {
   return (
-    <div
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+    <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
       className={`mx-3 my-1 px-2 py-1.5 rounded-lg border-2 border-dashed text-xs text-center transition-colors ${
         active ? 'border-blue-400 bg-blue-50 text-blue-500' : 'border-gray-200 text-gray-400'
-      }`}
-    >
+      }`}>
       Drop here to unsort
     </div>
   )
@@ -242,29 +218,37 @@ type SidebarFilter = 'all' | number
 
 export function NotesPage() {
   const [videos, setVideos] = useState<Video[]>([])
+  const [pages, setPages] = useState<Page[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
-  const [loadingVideos, setLoadingVideos] = useState(true)
-  const [selected, setSelected] = useState<Video | null>(null)
-  const [notes, setNotes] = useState<Note[]>([])
+  const [loadingAll, setLoadingAll] = useState(true)
+
+  // Selection — mutually exclusive: video, page, or feedback
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackNote | null>(null)
+
+  // Note content for selected item
+  const [videoNotes, setVideoNotes] = useState<Note[]>([])
+  const [pageNotes, setPageNotes] = useState<PageNote[]>([])
   const [loadingNotes, setLoadingNotes] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [regenError, setRegenError] = useState<string | null>(null)
+
+  // Sidebar state
   const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>('all')
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
 
-  // Drag-to-folder state
-  const [dragVideoId, setDragVideoId] = useState<string | null>(null)
-  const [dropTarget, setDropTarget] = useState<number | null | 'unsorted'>(undefined as unknown as null)
+  // Drag state
+  const [dragEntry, setDragEntry] = useState<Entry | null>(null)
+  const [dropTarget, setDropTarget] = useState<number | null | 'unsorted'>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Feedback state
+  // Feedback
   const [feedbackNotes, setFeedbackNotes] = useState<FeedbackNote[]>([])
-  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackNote | null>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [classifying, setClassifying] = useState(false)
 
-  // Model state
+  // Models
   const [customModels, setCustomModels] = useState<ModelConfig[]>(loadCustomModels)
   const [selectedModelId, setSelectedModelId] = useState(() => localStorage.getItem(LS_SELECTED) || 'deepseek-v3')
   const [showAddModelModal, setShowAddModelModal] = useState(false)
@@ -272,104 +256,117 @@ export function NotesPage() {
   const contentRef = useRef<HTMLDivElement>(null)
   const allModels = [...BUILTIN_MODELS, ...customModels]
   const selectedModel = allModels.find(m => m.id === selectedModelId) ?? BUILTIN_MODELS[0]
-  const latestNote = notes[0] ?? null
+
   const videosWithNotes = videos.filter(v => v.has_notes)
-  const unsortedVideos = videosWithNotes.filter(v => v.folder_id === null)
+  const pagesWithNotes = pages.filter(p => p.has_notes)
 
-  const filteredVideos = sidebarFilter === 'all'
-    ? videosWithNotes
-    : videosWithNotes.filter(v => v.folder_id === sidebarFilter)
+  // Build unified sorted entry list
+  const allEntries: Entry[] = [
+    ...videosWithNotes.map(v => ({ kind: 'video' as const, item: v })),
+    ...pagesWithNotes.map(p => ({ kind: 'page' as const, item: p })),
+  ].sort((a, b) => b.item.added_at.localeCompare(a.item.added_at))
 
-  // ── Load on mount ────────────────────────────────────────────────────────
+  const unsortedEntries = allEntries.filter(e => entryFolderId(e) === null)
+
+  const filteredEntries = sidebarFilter === 'all'
+    ? allEntries
+    : allEntries.filter(e => entryFolderId(e) === sidebarFilter)
+
+  // ── Load ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     let alive = true
-    Promise.all([api.videos.list(), api.folders.list(), api.anchor.listFeedback()])
-      .then(([vids, fols, fb]) => {
-        if (!alive) return
-        setVideos(vids)
-        setFolders(fols)
-        setFeedbackNotes(fb)
-        const withNotes = vids.filter(v => v.has_notes)
-        if (withNotes.length > 0) selectVideo(withNotes[0])
-      })
-      .catch(() => {})
-      .finally(() => { if (alive) setLoadingVideos(false) })
+    Promise.all([
+      api.videos.list(), api.pages.list(),
+      api.folders.list(), api.anchor.listFeedback(),
+    ]).then(([vids, pgs, fols, fb]) => {
+      if (!alive) return
+      setVideos(vids); setPages(pgs); setFolders(fols); setFeedbackNotes(fb)
+      const withNotes: Entry[] = [
+        ...vids.filter(v => v.has_notes).map(v => ({ kind: 'video' as const, item: v })),
+        ...pgs.filter(p => p.has_notes).map(p => ({ kind: 'page' as const, item: p })),
+      ].sort((a, b) => b.item.added_at.localeCompare(a.item.added_at))
+      if (withNotes.length > 0) void selectEntry(withNotes[0])
+    }).catch(() => {}).finally(() => { if (alive) setLoadingAll(false) })
     return () => { alive = false }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selectVideo = async (video: Video) => {
-    setSelected(video)
+  // ── Selection ─────────────────────────────────────────────────────────────
+
+  const selectEntry = async (entry: Entry) => {
+    setSelectedEntry(entry)
     setSelectedFeedback(null)
-    setNotes([])
-    setRegenError(null)
-    setLoadingNotes(true)
+    setVideoNotes([]); setPageNotes([])
+    setRegenError(null); setLoadingNotes(true)
     contentRef.current?.scrollTo({ top: 0 })
-    try { setNotes(await api.notes.get(video.id)) } catch { /* silent */ }
+    try {
+      if (entry.kind === 'video') {
+        setVideoNotes(await api.notes.get(entry.item.id as string))
+      } else {
+        setPageNotes(await api.pages.getNotes(entry.item.id as number))
+      }
+    } catch { /* silent */ }
     finally { setLoadingNotes(false) }
   }
 
   const selectFeedback = (fb: FeedbackNote) => {
-    setSelectedFeedback(fb)
-    setSelected(null)
-    setNotes([])
+    setSelectedFeedback(fb); setSelectedEntry(null)
+    setVideoNotes([]); setPageNotes([])
     contentRef.current?.scrollTo({ top: 0 })
   }
 
-  // ── Drag-to-folder ───────────────────────────────────────────────────────
+  // ── Drag-to-folder ────────────────────────────────────────────────────────
 
-  const handleDragStart = (videoId: string) => {
-    setDragVideoId(videoId)
-    setIsDragging(true)
-  }
-
-  const handleDragEnd = () => {
-    setDragVideoId(null)
-    setDropTarget(null as unknown as null)
-    setIsDragging(false)
-  }
+  const handleDragStart = (entry: Entry) => { setDragEntry(entry); setIsDragging(true) }
+  const handleDragEnd   = () => { setDragEntry(null); setDropTarget(null); setIsDragging(false) }
 
   const handleDrop = (folderId: number | null) => {
-    if (dragVideoId) void handleMoveToFolder(dragVideoId, folderId)
+    if (dragEntry) void handleMoveToFolder(dragEntry, folderId)
     handleDragEnd()
   }
 
-  // ── Folder CRUD ──────────────────────────────────────────────────────────
+  // ── Folder CRUD ───────────────────────────────────────────────────────────
 
   const handleCreateFolder = async () => {
-    const name = newFolderName.trim()
-    if (!name) return
+    const name = newFolderName.trim(); if (!name) return
     setCreatingFolder(true)
     try {
-      const folder = await api.folders.create(name)
-      setFolders(prev => [...prev, folder])
-      setNewFolderName('')
+      const f = await api.folders.create(name)
+      setFolders(prev => [...prev, f]); setNewFolderName('')
     } finally { setCreatingFolder(false) }
   }
 
   const handleRenameFolder = async (id: number, name: string) => {
-    const updated = await api.folders.rename(id, name)
-    setFolders(prev => prev.map(f => f.id === id ? updated : f))
+    const f = await api.folders.rename(id, name)
+    setFolders(prev => prev.map(x => x.id === id ? f : x))
   }
 
   const handleDeleteFolder = async (id: number) => {
-    if (!confirm('Delete this folder? Videos inside will become unsorted.')) return
+    if (!confirm('Delete this folder? Items inside will become unsorted.')) return
     await api.folders.delete(id)
     setFolders(prev => prev.filter(f => f.id !== id))
     setVideos(prev => prev.map(v => v.folder_id === id ? { ...v, folder_id: null } : v))
+    setPages(prev => prev.map(p => p.folder_id === id ? { ...p, folder_id: null } : p))
     if (sidebarFilter === id) setSidebarFilter('all')
   }
 
-  const handleMoveToFolder = async (videoId: string, folderId: number | null) => {
-    const updated = await api.videos.moveToFolder(videoId, folderId)
-    setVideos(prev => prev.map(v => v.id === videoId ? { ...v, folder_id: updated.folder_id } : v))
+  const handleMoveToFolder = async (entry: Entry, folderId: number | null) => {
+    if (entry.kind === 'video') {
+      const updated = await api.videos.moveToFolder(entry.item.id as string, folderId)
+      setVideos(prev => prev.map(v => v.id === updated.id ? { ...v, folder_id: updated.folder_id } : v))
+    } else {
+      const updated = await api.pages.moveToFolder(entry.item.id as number, folderId)
+      setPages(prev => prev.map(p => p.id === updated.id ? { ...p, folder_id: updated.folder_id } : p))
+    }
     setFolders(prev => {
-      const newVids = videos.map(v => v.id === videoId ? { ...v, folder_id: folderId } : v)
-      return prev.map(f => ({ ...f, video_count: newVids.filter(v => v.folder_id === f.id).length }))
+      const allWithUpdated = allEntries.map(e =>
+        entryId(e) === entryId(entry) ? { ...e, item: { ...e.item, folder_id: folderId } } : e
+      )
+      return prev.map(f => ({ ...f, video_count: allWithUpdated.filter(e => entryFolderId(e) === f.id).length }))
     })
   }
 
-  // ── Feedback / classify ──────────────────────────────────────────────────
+  // ── Feedback / classify ───────────────────────────────────────────────────
 
   const handleClassify = async () => {
     setClassifying(true)
@@ -377,84 +374,91 @@ export function NotesPage() {
       const fb = await api.anchor.classify()
       setFeedbackNotes(prev => [fb, ...prev.filter(f => f.date !== fb.date)])
       setFeedbackOpen(true)
-      // Refresh videos and folders after classification moves things around
       const [vids, fols] = await Promise.all([api.videos.list(), api.folders.list()])
-      setVideos(vids)
-      setFolders(fols)
-    } catch (e) {
-      alert((e as Error).message)
-    } finally { setClassifying(false) }
+      setVideos(vids); setFolders(fols)
+    } catch (e) { alert((e as Error).message) }
+    finally { setClassifying(false) }
   }
 
-  // ── Regenerate & save ────────────────────────────────────────────────────
+  // ── Regenerate / save ─────────────────────────────────────────────────────
 
   const handleRegenerate = async () => {
-    if (!selected) return
-    setRegenerating(true)
-    setRegenError(null)
+    if (!selectedEntry) return
+    setRegenerating(true); setRegenError(null)
     try {
-      const note = await api.notes.generate(selected.id, selectedModel)
-      setNotes(prev => [note, ...prev])
-      setVideos(prev => prev.map(v => v.id === note.video_id ? { ...v, has_notes: true } : v))
-    } catch (e: unknown) {
+      if (selectedEntry.kind === 'video') {
+        const note = await api.notes.generate(selectedEntry.item.id as string, selectedModel)
+        setVideoNotes(prev => [note, ...prev])
+        setVideos(prev => prev.map(v => v.id === note.video_id ? { ...v, has_notes: true } : v))
+      } else {
+        const note = await api.pages.regenerate(selectedEntry.item.id as number)
+        setPageNotes(prev => [note, ...prev])
+        setPages(prev => prev.map(p => p.id === note.page_id ? { ...p, has_notes: true } : p))
+      }
+    } catch (e) {
       setRegenError(e instanceof Error ? e.message : 'Regeneration failed')
     } finally { setRegenerating(false) }
   }
 
   const handleSaveNote = async (content: string) => {
-    if (!latestNote) return
-    const updated = await api.notes.update(latestNote.id, content)
-    setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+    if (!selectedEntry) return
+    if (selectedEntry.kind === 'video') {
+      const latest = videoNotes[0]; if (!latest) return
+      const updated = await api.notes.update(latest.id, content)
+      setVideoNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+    } else {
+      const updated = await api.pages.updateNote(selectedEntry.item.id as number, content)
+      setPageNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+    }
   }
 
   const handleSelectModel = (model: ModelConfig) => {
-    setSelectedModelId(model.id)
-    localStorage.setItem(LS_SELECTED, model.id)
+    setSelectedModelId(model.id); localStorage.setItem(LS_SELECTED, model.id)
   }
-
   const handleAddModel = (model: ModelConfig) => {
     const updated = [...customModels, model]
-    setCustomModels(updated)
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(updated))
+    setCustomModels(updated); localStorage.setItem(LS_CUSTOM, JSON.stringify(updated))
     handleSelectModel(model)
   }
-
   const handleDeleteModel = (modelId: string) => {
     const updated = customModels.filter(m => m.id !== modelId)
-    setCustomModels(updated)
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(updated))
+    setCustomModels(updated); localStorage.setItem(LS_CUSTOM, JSON.stringify(updated))
     if (selectedModelId === modelId) handleSelectModel(BUILTIN_MODELS[0])
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Ordered list for sidebar ──────────────────────────────────────────────
 
-  const orderedVideos = sidebarFilter === 'all'
+  const orderedEntries = sidebarFilter === 'all'
     ? [
-        ...folders.flatMap(f => videosWithNotes.filter(v => v.folder_id === f.id)),
-        ...unsortedVideos,
+        ...folders.flatMap(f => allEntries.filter(e => entryFolderId(e) === f.id)),
+        ...unsortedEntries,
       ]
-    : filteredVideos
+    : filteredEntries
+
+  const hasContent = allEntries.length > 0 || feedbackNotes.length > 0
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <AppHeader />
 
-      {loadingVideos && (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading notes…</div>
+      {loadingAll && (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
       )}
 
-      {!loadingVideos && videosWithNotes.length === 0 && feedbackNotes.length === 0 && (
+      {!loadingAll && !hasContent && (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
           <BookOpen size={44} className="text-gray-200 mb-4" />
           <p className="text-gray-500 mb-1">No notes yet</p>
-          <p className="text-sm text-gray-400 mb-5">Add videos in Collection and generate notes — they'll appear here.</p>
+          <p className="text-sm text-gray-400 mb-5">Add videos or pages in Collection and generate notes — they'll appear here.</p>
           <Link to="/" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
             Go to Collection
           </Link>
         </div>
       )}
 
-      {!loadingVideos && (videosWithNotes.length > 0 || feedbackNotes.length > 0) && (
+      {!loadingAll && hasContent && (
         <div className="flex-1 flex overflow-hidden">
 
           {/* ── Left sidebar ── */}
@@ -462,127 +466,99 @@ export function NotesPage() {
             <div className="px-3 pt-4 pb-2 flex-shrink-0">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Topics</p>
 
-              <button
-                onClick={() => setSidebarFilter('all')}
+              <button onClick={() => setSidebarFilter('all')}
                 className={`w-full text-left px-2 py-1.5 rounded-lg text-sm mb-1 transition-colors ${
                   sidebarFilter === 'all' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                All Notes <span className="text-xs text-gray-400">({videosWithNotes.length})</span>
+                }`}>
+                All Notes <span className="text-xs text-gray-400">({allEntries.length})</span>
               </button>
 
               <div className="border-t border-gray-100 my-2" />
 
-              {/* Folder rows — also drag drop targets */}
               {folders.map(folder => (
-                <FolderRow
-                  key={folder.id}
-                  folder={folder}
+                <FolderRow key={folder.id} folder={folder}
                   isSelected={sidebarFilter === folder.id}
                   isDragOver={dropTarget === folder.id}
                   onSelect={() => setSidebarFilter(folder.id)}
                   onRename={name => handleRenameFolder(folder.id, name)}
-                  onDelete={() => handleDeleteFolder(folder.id)}
+                  onDelete={() => void handleDeleteFolder(folder.id)}
                   onDragOver={e => { e.preventDefault(); setDropTarget(folder.id) }}
-                  onDragLeave={() => setDropTarget(null as unknown as null)}
+                  onDragLeave={() => setDropTarget(null)}
                   onDrop={e => { e.preventDefault(); handleDrop(folder.id) }}
                 />
               ))}
 
-              {/* Drop zone for unsorted */}
               {isDragging && (
-                <UnsortedDropZone
-                  active={dropTarget === 'unsorted'}
+                <UnsortedDropZone active={dropTarget === 'unsorted'}
                   onDragOver={e => { e.preventDefault(); setDropTarget('unsorted') }}
-                  onDragLeave={() => setDropTarget(null as unknown as null)}
+                  onDragLeave={() => setDropTarget(null)}
                   onDrop={e => { e.preventDefault(); handleDrop(null) }}
                 />
               )}
 
-              {/* New folder input */}
               <div className="flex items-center gap-1 mt-2">
-                <input
-                  value={newFolderName}
-                  onChange={e => setNewFolderName(e.target.value)}
+                <input value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') void handleCreateFolder() }}
                   placeholder="New folder…"
-                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-                />
-                <button
-                  onClick={() => void handleCreateFolder()}
+                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                <button onClick={() => void handleCreateFolder()}
                   disabled={!newFolderName.trim() || creatingFolder}
-                  className="px-2 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors"
-                >
+                  className="px-2 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
                   {creatingFolder ? '…' : '+'}
                 </button>
               </div>
 
               <div className="border-t border-gray-100 my-3" />
 
-              {/* ── Feedback section ── */}
+              {/* Feedback section */}
               <div className="flex items-center gap-1 mb-1">
-                <button
-                  onClick={() => setFeedbackOpen(o => !o)}
-                  className="flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase tracking-wider flex-1 hover:text-gray-600 transition-colors"
-                >
+                <button onClick={() => setFeedbackOpen(o => !o)}
+                  className="flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase tracking-wider flex-1 hover:text-gray-600 transition-colors">
                   {feedbackOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   Feedback
                   {feedbackNotes.length > 0 && (
-                    <span className="ml-1 text-gray-400 font-normal normal-case tracking-normal">({feedbackNotes.length})</span>
+                    <span className="ml-1 font-normal normal-case tracking-normal text-gray-400">({feedbackNotes.length})</span>
                   )}
                 </button>
-                <button
-                  onClick={() => void handleClassify()}
-                  disabled={classifying}
-                  title="Classify all Anchoring videos now"
-                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md font-medium transition-colors disabled:opacity-50"
-                >
-                  <Sparkles size={9} />
-                  {classifying ? 'Running…' : 'Classify Now'}
+                <button onClick={() => void handleClassify()} disabled={classifying}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md font-medium transition-colors disabled:opacity-50">
+                  <Sparkles size={9} />{classifying ? 'Running…' : 'Classify Now'}
                 </button>
               </div>
 
               {feedbackOpen && (
                 <div className="space-y-px">
-                  {feedbackNotes.length === 0 ? (
-                    <p className="text-xs text-gray-400 px-2 py-1">No feedback notes yet.</p>
-                  ) : (
-                    feedbackNotes.map(fb => (
-                      <button
-                        key={fb.id}
-                        onClick={() => selectFeedback(fb)}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                          selectedFeedback?.id === fb.id
-                            ? 'bg-purple-50 text-purple-700 font-medium'
-                            : 'text-gray-600 hover:bg-gray-50'
-                        }`}
-                      >
-                        📋 {fb.date}-Feedback
-                      </button>
-                    ))
-                  )}
+                  {feedbackNotes.length === 0
+                    ? <p className="text-xs text-gray-400 px-2 py-1">No feedback notes yet.</p>
+                    : feedbackNotes.map(fb => (
+                        <button key={fb.id} onClick={() => selectFeedback(fb)}
+                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            selectedFeedback?.id === fb.id ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                          }`}>
+                          📋 {fb.date}-Feedback
+                        </button>
+                      ))
+                  }
                 </div>
               )}
             </div>
 
-            {/* Video list */}
+            {/* Entry list */}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-              {orderedVideos.map(v => (
-                <SidebarItem
-                  key={v.id}
-                  video={v}
-                  isSelected={selected?.id === v.id}
+              {orderedEntries.map(entry => (
+                <SidebarEntryItem key={entryId(entry)} entry={entry}
+                  isSelected={selectedEntry ? entryId(selectedEntry) === entryId(entry) : false}
                   folders={folders}
-                  onClick={() => void selectVideo(v)}
-                  onFolderChange={folderId => void handleMoveToFolder(v.id, folderId)}
-                  onDragStart={() => handleDragStart(v.id)}
+                  onClick={() => void selectEntry(entry)}
+                  onFolderChange={folderId => void handleMoveToFolder(entry, folderId)}
+                  onDragStart={() => handleDragStart(entry)}
                   onDragEnd={handleDragEnd}
                 />
               ))}
             </div>
           </aside>
 
-          {/* ── Right content ── */}
+          {/* ── Right panel ── */}
           <div ref={contentRef} className="flex-1 overflow-y-auto bg-gray-50">
             {renderRightPanel()}
           </div>
@@ -615,56 +591,60 @@ export function NotesPage() {
       )
     }
 
-    if (!selected) {
-      return (
-        <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-          Select a topic from the left
-        </div>
-      )
+    if (!selectedEntry) {
+      return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Select a topic from the left</div>
     }
+
+    const isPage = selectedEntry.kind === 'page'
+    const item = selectedEntry.item as Video & Page
+    const latestNote = isPage ? pageNotes[0] : videoNotes[0]
+    const folder = folders.find(f => f.id === item.folder_id)
 
     return (
       <div className="max-w-3xl mx-auto px-8 py-8">
-        {/* Video header */}
+        {/* Header */}
         <div className="flex items-start gap-4 mb-6 pb-5 border-b border-gray-200">
-          {selected.thumbnail && (
-            <img src={selected.thumbnail} alt="" className="w-24 h-14 rounded-lg object-cover flex-shrink-0" />
+          {item.thumbnail ? (
+            <img src={item.thumbnail} alt="" className="w-24 h-14 rounded-lg object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-24 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+              <Globe size={24} className="text-gray-300" />
+            </div>
           )}
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-gray-900 leading-snug mb-0.5">{selected.title}</h1>
-            <p className="text-sm text-gray-500">{selected.channel}</p>
+            <h1 className="text-lg font-bold text-gray-900 leading-snug mb-0.5">{item.title}</h1>
+            <p className="text-sm text-gray-500">
+              {isPage ? (item.site_name || new URL(item.url).hostname) : item.channel}
+              {isPage && item.author && <span className="text-gray-400"> · {item.author}</span>}
+              {!isPage && item.duration && <span className="text-gray-400"> · {item.duration}</span>}
+            </p>
+            {isPage && (
+              <a href={item.url} target="_blank" rel="noreferrer"
+                className="text-xs text-blue-500 hover:underline truncate block mt-0.5">
+                {item.url}
+              </a>
+            )}
             {latestNote && <p className="text-xs text-gray-400 mt-1">Generated {formatDate(latestNote.generated_at)}</p>}
-            {(() => {
-              const f = folders.find(x => x.id === selected.folder_id)
-              return f ? (
-                <span className={`mt-1.5 inline-block text-xs px-2 py-0.5 rounded-full font-medium ${folderColor(f.id)}`}>
-                  {f.name}
-                </span>
-              ) : null
-            })()}
+            {folder && (
+              <span className={`mt-1.5 inline-block text-xs px-2 py-0.5 rounded-full font-medium ${folderColor(folder.id)}`}>
+                {folder.name}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => void handleRegenerate()}
-              disabled={regenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-l-lg hover:bg-white transition-colors disabled:opacity-50 border-r-0"
-            >
+            <button onClick={() => void handleRegenerate()} disabled={regenerating}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-l-lg hover:bg-white transition-colors disabled:opacity-50 border-r-0">
               {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               {regenerating ? 'Generating…' : 'Regenerate'}
             </button>
-            <ModelSelector
-              models={allModels}
-              selectedId={selectedModel.id}
-              onSelect={handleSelectModel}
-              onAddNew={() => setShowAddModelModal(true)}
-              onDelete={handleDeleteModel}
-            />
+            {!isPage && (
+              <ModelSelector models={allModels} selectedId={selectedModel.id}
+                onSelect={handleSelectModel} onAddNew={() => setShowAddModelModal(true)} onDelete={handleDeleteModel} />
+            )}
           </div>
         </div>
 
-        {regenError && (
-          <div className="mb-4 px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg">{regenError}</div>
-        )}
+        {regenError && <div className="mb-4 px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg">{regenError}</div>}
 
         {loadingNotes && (
           <div className="flex items-center gap-2 text-gray-400 text-sm py-12 justify-center">
@@ -672,9 +652,7 @@ export function NotesPage() {
           </div>
         )}
         {!loadingNotes && !latestNote && (
-          <div className="text-center py-12 text-gray-400 text-sm">
-            No notes yet — use Regenerate to create them.
-          </div>
+          <div className="text-center py-12 text-gray-400 text-sm">No notes yet — use Regenerate to create them.</div>
         )}
         {!loadingNotes && latestNote && (
           <MarkdownEditor content={latestNote.content} onSave={handleSaveNote} />
