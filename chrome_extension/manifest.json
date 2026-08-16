@@ -2,9 +2,17 @@
   "manifest_version": 3,
   "name": "Anchor",
   "version": "1.0.0",
-  "description": "Save YouTube videos and generate AI notes directly from your browser.",
+  "description": "Organize YouTube videos into study folders, generate AI notes, quiz cards, and a tutor chatbot from them.",
   "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["https://www.youtube.com/*", "http://localhost:8000/*"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.deepseek.com/*",
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*",
+    "http://localhost/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
@@ -19,10 +27,10 @@
   "action": {
     "default_popup": "index.html",
     "default_icon": {
-      "16": "icons/icon_black.png",
-      "32": "icons/icon_black.png",
-      "48": "icons/icon_black.png",
-      "128": "icons/icon_black.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
   "web_accessible_resources": [
@@ -32,9 +40,9 @@
     }
   ],
   "icons": {
-    "16": "icons/icon_black.png",
-    "32": "icons/icon_black.png",
-    "48": "icons/icon_black.png",
-    "128": "icons/icon_black.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
