@@ -2,9 +2,17 @@
   "manifest_version": 3,
   "name": "Anchor",
   "version": "1.0.0",
-  "description": "Save YouTube videos and generate AI notes directly from your browser.",
+  "description": "Organize YouTube videos into study folders, generate AI notes, quiz cards, and a tutor chatbot from them.",
   "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["https://www.youtube.com/*", "http://localhost:8000/*"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.deepseek.com/*",
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*",
+    "http://localhost/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
